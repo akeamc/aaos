@@ -39,6 +39,8 @@ extern "x86-interrupt" fn test_double_fault_handler(
 ) -> ! {
     serial_println!("\x1b[32mok\x1b[0m");
     exit_qemu(QemuExitCode::Success);
+
+    #[allow(clippy::empty_loop)]
     loop {}
 }
 

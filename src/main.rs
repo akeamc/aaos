@@ -6,12 +6,28 @@
 #![test_runner(aaos::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use aaos::println;
-use core::panic::PanicInfo;
+extern crate alloc;
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+use aaos::println;
+use bootloader::{entry_point, BootInfo};
+use core::panic::PanicInfo;
+use x86_64::VirtAddr;
+
+entry_point!(kernel_main);
+
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    use aaos::allocator;
+    use aaos::memory::{self, BootInfoFrameAllocator};
+
+    println!("hello world");
+
     aaos::init();
+
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
     #[cfg(test)]
     test_main();
