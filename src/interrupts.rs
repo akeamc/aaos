@@ -44,9 +44,37 @@ lazy_static! {
   };
 }
 
+/// Set the divisor of the PIT.
+///
+/// # Panics
+///
+/// In debug mode, this will panic if the divisor becomes greater than [`u16::MAX`].
+/// `hz` must not be less than `1_193_180.0 / 65_535.0` (about 18.207).
+fn set_pit_phase(hz: f32) {
+    use x86_64::instructions::port::Port;
+
+    let divisor = 1193180.0 / hz;
+
+    debug_assert!(
+        divisor <= u16::MAX as f32,
+        "divisor ({}) is too big",
+        divisor
+    );
+
+    unsafe { Port::<u8>::new(0x43).write(0x36) }; // set command byte 0x36
+
+    let mut port = Port::new(0x40);
+
+    for b in (divisor as u16).to_le_bytes() {
+        unsafe { port.write(b) };
+    }
+}
+
 /// Initialize the Interrupt Descriptor Table (IDT).
 pub fn init_idt() {
     IDT.load();
+
+    set_pit_phase(60.0);
 }
 
 extern "x86-interrupt" fn handle_breakpoint(stack_frame: InterruptStackFrame) {

@@ -10,7 +10,7 @@ use volatile::Volatile;
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Color {
+pub enum Foreground {
     Black = 0,
     Blue = 1,
     Green = 2,
@@ -29,13 +29,43 @@ pub enum Color {
     White = 15,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Background {
+    Black = 0,
+    Blue,
+    Green,
+    Cyan,
+    Red,
+    Magenta,
+    Brown,
+    White,
+    BlackBlink,
+    BlueBlink,
+    GreenBlink,
+    CyanBlink,
+    RedBlink,
+    MagentaBlink,
+    BrownBlink,
+    WhiteBlink,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ColorCode(pub u8);
+pub struct CharColor(pub u8);
 
-impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> Self {
+impl CharColor {
+    pub const fn new(foreground: Foreground, background: Background) -> Self {
         Self((background as u8) << 4 | (foreground as u8))
+    }
+
+    pub const fn white_on_black() -> Self {
+        Self::new(Foreground::White, Background::Black)
+    }
+
+    pub const fn black_on_white() -> Self {
+        Self::new(Foreground::Black, Background::White)
     }
 }
 
@@ -43,11 +73,11 @@ impl ColorCode {
 #[repr(C)]
 pub struct ScreenChar {
     ascii_character: u8,
-    color_code: ColorCode,
+    color_code: CharColor,
 }
 
 impl ScreenChar {
-    pub fn new(ascii_character: u8, color_code: ColorCode) -> Self {
+    pub fn new(ascii_character: u8, color_code: CharColor) -> Self {
         Self {
             ascii_character,
             color_code,
@@ -80,14 +110,14 @@ pub struct Buffer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        default_color_code: ColorCode::new(Color::White, Color::Black),
+        default_color_code: CharColor::white_on_black(),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
 
 pub struct Writer {
     pub column_position: usize,
-    pub default_color_code: ColorCode,
+    pub default_color_code: CharColor,
     pub buffer: &'static mut Buffer,
 }
 
