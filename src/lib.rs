@@ -16,7 +16,7 @@ use bootloader::{entry_point, BootInfo};
 #[macro_use]
 pub mod serial;
 #[macro_use]
-pub mod vga_buffer;
+pub mod vga;
 pub mod allocator;
 pub mod clock;
 pub mod gdt;

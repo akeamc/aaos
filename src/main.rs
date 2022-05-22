@@ -8,7 +8,7 @@
 
 extern crate alloc;
 
-use aaos::{println};
+use aaos::{log, println};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
@@ -30,7 +30,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
-    println!("it did not crash");
+    log!("it did not crash");
 
     aaos::hlt_loop()
 }
