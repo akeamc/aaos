@@ -1,25 +1,9 @@
-use crate::sys::pic::{PICS, PIC_1_OFFSET};
+use crate::sys;
 use lazy_static::lazy_static;
+use sys::pic::Irq;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 use crate::hlt_loop;
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u8)]
-pub enum Irq {
-    Timer = PIC_1_OFFSET,
-    Keyboard,
-}
-
-impl Irq {
-    pub fn as_u8(self) -> u8 {
-        self as u8
-    }
-
-    pub fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
-    }
-}
 
 lazy_static! {
   static ref IDT: InterruptDescriptorTable = {
@@ -27,12 +11,12 @@ lazy_static! {
       idt.breakpoint.set_handler_fn(handle_breakpoint);
       unsafe {
         idt.double_fault.set_handler_fn(handle_double_fault)
-            .set_stack_index(crate::sys::gdt::DOUBLE_FAULT_IST_INDEX); // new
+            .set_stack_index(sys::gdt::DOUBLE_FAULT_IST_INDEX); // new
     }
     idt.page_fault.set_handler_fn(handle_page_fault);
 
-    idt[Irq::Timer.as_usize()].set_handler_fn(crate::sys::time::handle_timer_interrupt);
-    idt[Irq::Keyboard.as_usize()].set_handler_fn(handle_keyboard_interrupt);
+    idt[Irq::Timer.as_usize()].set_handler_fn(sys::time::handle_timer_interrupt);
+    idt[Irq::Keyboard.as_usize()].set_handler_fn(sys::keyboard::handle_interrupt);
 
       idt
   };
@@ -66,35 +50,6 @@ extern "x86-interrupt" fn handle_page_fault(
     println!("{:#?}", stack_fame);
 
     hlt_loop();
-}
-
-extern "x86-interrupt" fn handle_keyboard_interrupt(_stack_frame: InterruptStackFrame) {
-    use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-    use spin::Mutex;
-    use x86_64::instructions::port::Port;
-
-    lazy_static! {
-        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
-            Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
-        );
-    }
-
-    let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60);
-
-    let scancode: u8 = unsafe { port.read() };
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::RawKey(key) => print!("{:?}", key),
-                DecodedKey::Unicode(character) => print!("{}", character),
-            }
-        }
-    }
-
-    unsafe {
-        PICS.lock().notify_end_of_interrupt(Irq::Keyboard.as_u8());
-    }
 }
 
 #[test_case]

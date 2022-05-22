@@ -6,6 +6,7 @@ pub mod allocator;
 pub mod clock;
 pub mod gdt;
 pub mod idt;
+pub mod keyboard;
 pub mod memory;
 pub mod pic;
 pub mod time;
