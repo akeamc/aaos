@@ -18,15 +18,18 @@ pub mod serial;
 #[macro_use]
 pub mod vga_buffer;
 pub mod allocator;
+pub mod clock;
 pub mod gdt;
-pub mod interrupts;
+pub mod idt;
 pub mod memory;
+pub mod time;
 
 pub fn init() {
     gdt::init();
-    interrupts::init_idt();
-    unsafe { interrupts::PICS.lock().initialize() };
+    idt::init_idt();
+    unsafe { idt::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
+    time::init();
 }
 
 pub trait Testable {

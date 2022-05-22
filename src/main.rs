@@ -8,7 +8,7 @@
 
 extern crate alloc;
 
-use aaos::println;
+use aaos::{println};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
