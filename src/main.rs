@@ -8,7 +8,7 @@
 
 extern crate alloc;
 
-use aaos::{pretty::print_logo, println};
+use aaos::println;
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
@@ -18,8 +18,6 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use aaos::allocator;
     use aaos::memory::{self, BootInfoFrameAllocator};
-
-    print_logo(1, 23);
 
     aaos::init();
 
