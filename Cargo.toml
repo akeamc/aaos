@@ -28,4 +28,5 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 spin = "0.9.3"
 uart_16550 = "0.2.18"
 volatile = "0.4.5"
+vte = "0.10.1"
 x86_64 = "0.14.9"

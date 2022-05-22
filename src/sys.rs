@@ -17,7 +17,7 @@ macro_rules! log {
         if !cfg!(test) {
             let uptime = $crate::sys::clock::uptime();
 
-            $crate::sys::vga::print_fmt(format_args!("[{:.6}] {}\n", uptime, format_args!($($arg)*)));
+            $crate::sys::vga::print_fmt(format_args!("\x1b[92m[{:>12.6}]\x1b[0m {}\n", uptime, format_args!($($arg)*)));
         }
     });
 }

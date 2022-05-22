@@ -2,11 +2,18 @@ use core::fmt;
 
 use lazy_static::lazy_static;
 use spin::Mutex;
+use vte::{Params, Parser, Perform};
+
+pub const BUFFER_HEIGHT: usize = 25;
+pub const BUFFER_WIDTH: usize = 80;
+const FG: Color = Color::LightGray;
+const BG: Color = Color::Black;
 
 lazy_static! {
+    pub static ref PARSER: Mutex<Parser> = Mutex::new(Parser::new());
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: CharColor::white_on_black(),
+        color_code: CharColor::new(FG, BG),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -14,7 +21,7 @@ lazy_static! {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Foreground {
+pub enum Color {
     Black = 0,
     Blue,
     Green,
@@ -33,26 +40,30 @@ pub enum Foreground {
     White,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Background {
-    Black = 0,
-    Blue,
-    Green,
-    Cyan,
-    Red,
-    Magenta,
-    Brown,
-    White,
-    BlackBlink,
-    BlueBlink,
-    GreenBlink,
-    CyanBlink,
-    RedBlink,
-    MagentaBlink,
-    BrownBlink,
-    WhiteBlink,
+impl Color {
+    pub fn from_ansi(code: u8) -> Self {
+        use Color::*;
+
+        match code {
+            30 => Black,
+            31 => Red,
+            32 => Green,
+            33 => Brown,
+            34 => Blue,
+            35 => Magenta,
+            36 => Cyan,
+            37 => LightGray,
+            90 => DarkGray,
+            91 => LightRed,
+            92 => LightGreen,
+            93 => Yellow,
+            94 => LightBlue,
+            95 => Pink,
+            96 => LightCyan,
+            97 => White,
+            _ => Black, // fallback
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,16 +71,8 @@ pub enum Background {
 pub struct CharColor(pub u8);
 
 impl CharColor {
-    pub const fn new(foreground: Foreground, background: Background) -> Self {
+    pub const fn new(foreground: Color, background: Color) -> Self {
         Self((background as u8) << 4 | (foreground as u8))
-    }
-
-    pub const fn white_on_black() -> Self {
-        Self::new(Foreground::White, Background::Black)
-    }
-
-    pub const fn black_on_white() -> Self {
-        Self::new(Foreground::Black, Background::White)
     }
 }
 
@@ -88,9 +91,6 @@ impl ScreenChar {
         }
     }
 }
-
-pub const BUFFER_HEIGHT: usize = 25;
-pub const BUFFER_WIDTH: usize = 80;
 
 #[repr(transparent)]
 pub struct Buffer {
@@ -143,17 +143,61 @@ impl Writer {
             unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row][col], blank) };
         }
     }
+
+    fn set_color(&mut self, color: CharColor) {
+        self.color_code = color;
+    }
+}
+
+impl Perform for Writer {
+    fn print(&mut self, c: char) {
+        self.write_byte(c as u8);
+    }
+
+    fn execute(&mut self, byte: u8) {
+        self.write_byte(byte);
+    }
+
+    fn csi_dispatch(&mut self, params: &Params, _intermediates: &[u8], _ignore: bool, c: char) {
+        match c {
+            'm' => {
+                let mut fg = FG;
+                let mut bg = BG;
+
+                for param in params {
+                    match param[0] {
+                        0 => {
+                            // reset
+                            fg = FG;
+                            bg = BG;
+                        }
+                        30..=37 | 90..=97 => fg = Color::from_ansi(param[0] as u8),
+                        40..=47 | 100..=107 => bg = Color::from_ansi(param[0] as u8 - 10),
+                        _ => {}
+                    }
+                }
+
+                self.set_color(CharColor::new(fg, bg));
+            }
+            'A' => {}
+            'B' => {}
+            'C' => {}
+            'D' => {}
+            'E' => {}
+            'F' => {}
+            'G' => {}
+            'J' => {}
+            'K' => {}
+            _ => {}
+        }
+    }
 }
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
+        let mut parser = PARSER.lock();
         for byte in s.bytes() {
-            match byte {
-                // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not part of printable ASCII range
-                _ => self.write_byte(0xfe),
-            }
+            parser.advance(self, byte);
         }
 
         Ok(())
