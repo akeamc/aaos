@@ -3,10 +3,7 @@ use x86_64::{
     structures::idt::InterruptStackFrame,
 };
 
-use crate::{
-    clock::uptime,
-    idt::{Irq, PICS},
-};
+use crate::{clock::uptime, idt::Irq, pic::PICS};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0; // 1_193_181.666 Hz

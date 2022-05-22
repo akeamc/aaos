@@ -22,13 +22,13 @@ pub mod clock;
 pub mod gdt;
 pub mod idt;
 pub mod memory;
+pub mod pic;
 pub mod time;
 
 pub fn init() {
     gdt::init();
-    idt::init_idt();
-    unsafe { idt::PICS.lock().initialize() };
-    x86_64::instructions::interrupts::enable();
+    idt::init();
+    pic::init();
     time::init();
 }
 
