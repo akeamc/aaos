@@ -8,28 +8,24 @@
 
 extern crate alloc;
 
+use bootloader::BootInfo;
 use core::panic::PanicInfo;
 
 #[cfg(test)]
-use bootloader::{entry_point, BootInfo};
+use bootloader::entry_point;
 
 #[macro_use]
-pub mod serial;
-#[macro_use]
-pub mod vga;
-pub mod allocator;
-pub mod clock;
-pub mod gdt;
-pub mod idt;
-pub mod memory;
-pub mod pic;
-pub mod time;
+pub mod sys;
 
-pub fn init() {
-    gdt::init();
-    idt::init();
-    pic::init();
-    time::init();
+pub fn init(boot_info: &'static BootInfo) {
+    sys::gdt::init();
+    sys::idt::init();
+    sys::pic::init();
+    sys::time::init();
+
+    log!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+
+    sys::memory::init(boot_info);
 }
 
 pub trait Testable {
@@ -90,8 +86,8 @@ entry_point!(test_kernel_main);
 /// Entrypoint for `cargo test`
 #[cfg(test)]
 #[no_mangle]
-pub fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
-    init();
+pub fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
+    init(boot_info);
 
     #[cfg(test)]
     test_main();

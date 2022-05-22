@@ -1,4 +1,4 @@
-use crate::time::{ticks, PIT_INTERVAL_SECS};
+use crate::sys::time::{ticks, PIT_INTERVAL_SECS};
 
 /// System uptime (seconds).
 pub fn uptime() -> f64 {

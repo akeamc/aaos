@@ -171,7 +171,7 @@ pub fn print_fmt(args: fmt::Arguments) {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga::print_fmt(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::sys::vga::print_fmt(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -190,17 +190,6 @@ fn test_println_many() {
     for _ in 0..200 {
         println!("test_println_many output");
     }
-}
-
-#[macro_export]
-macro_rules! log {
-    ($($arg:tt)*) => ({
-        if !cfg!(test) {
-            let uptime = $crate::clock::uptime();
-
-            $crate::vga::print_fmt(format_args!("[{:.6}] {}\n", uptime, format_args!($($arg)*)));
-        }
-    });
 }
 
 #[test_case]

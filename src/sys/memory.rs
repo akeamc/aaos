@@ -1,13 +1,26 @@
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use crate::sys;
+use bootloader::{
+    bootinfo::{MemoryMap, MemoryRegionType},
+    BootInfo,
+};
 use x86_64::{
     structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
 };
 
+pub fn init(boot_info: &'static BootInfo) {
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { mapper(phys_mem_offset) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+
+    sys::allocator::init_heap(&mut mapper, &mut frame_allocator)
+        .expect("heap initialization failed");
+}
+
 /// # Safety
 ///
 /// yolo
-pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+pub unsafe fn mapper(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
     OffsetPageTable::new(level_4_table, physical_memory_offset)
 }

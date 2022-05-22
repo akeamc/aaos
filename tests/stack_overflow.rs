@@ -12,7 +12,7 @@ use aaos::{exit_qemu, serial_print, serial_println, QemuExitCode};
 pub extern "C" fn _start() -> ! {
     serial_print!("test stack_overflow ... ");
 
-    aaos::gdt::init();
+    aaos::sys::gdt::init();
     init_test_idt();
 
     stack_overflow();
@@ -26,7 +26,7 @@ lazy_static! {
         unsafe {
             idt.double_fault
                 .set_handler_fn(test_double_fault_handler)
-                .set_stack_index(aaos::gdt::DOUBLE_FAULT_IST_INDEX);
+                .set_stack_index(aaos::sys::gdt::DOUBLE_FAULT_IST_INDEX);
         }
 
         idt

@@ -1,4 +1,4 @@
-use crate::pic::{PICS, PIC_1_OFFSET};
+use crate::sys::pic::{PICS, PIC_1_OFFSET};
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
@@ -27,11 +27,11 @@ lazy_static! {
       idt.breakpoint.set_handler_fn(handle_breakpoint);
       unsafe {
         idt.double_fault.set_handler_fn(handle_double_fault)
-            .set_stack_index(crate::gdt::DOUBLE_FAULT_IST_INDEX); // new
+            .set_stack_index(crate::sys::gdt::DOUBLE_FAULT_IST_INDEX); // new
     }
     idt.page_fault.set_handler_fn(handle_page_fault);
 
-    idt[Irq::Timer.as_usize()].set_handler_fn(crate::time::handle_timer_interrupt);
+    idt[Irq::Timer.as_usize()].set_handler_fn(crate::sys::time::handle_timer_interrupt);
     idt[Irq::Keyboard.as_usize()].set_handler_fn(handle_keyboard_interrupt);
 
       idt

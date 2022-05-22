@@ -13,15 +13,7 @@ use core::panic::PanicInfo;
 entry_point!(main);
 
 fn main(boot_info: &'static BootInfo) -> ! {
-    use aaos::allocator;
-    use aaos::memory::{self, BootInfoFrameAllocator};
-    use x86_64::VirtAddr;
-
-    aaos::init();
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
-    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+    aaos::init(boot_info);
 
     test_main();
 
@@ -56,7 +48,7 @@ fn large_vec() {
 
 #[test_case]
 fn many_boxes() {
-    use aaos::allocator::HEAP_SIZE;
+    use aaos::sys::allocator::HEAP_SIZE;
 
     for i in 0..HEAP_SIZE {
         let x = Box::new(i);
