@@ -115,6 +115,18 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            0x08 => {
+                // backspace
+                if self.next_position.0 > 0 {
+                    let c = ScreenChar {
+                        ascii_character: b' ',
+                        color_code: self.color_code,
+                    };
+                    self.next_position.0 -= 1;
+                    let (col, row) = self.next_position;
+                    unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row][col], c) };
+                }
+            }
             byte => {
                 if self.next_position.0 >= BUFFER_WIDTH {
                     self.new_line();
