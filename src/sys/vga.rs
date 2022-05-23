@@ -157,7 +157,7 @@ impl Writer {
         self.next_position.0 = 0;
     }
 
-    fn clear_row(&mut self, row: usize) {
+    pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.color_code,
@@ -167,7 +167,13 @@ impl Writer {
         }
     }
 
-    fn set_color(&mut self, color: CharColor) {
+    pub fn clear_screen(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
+            self.clear_row(row);
+        }
+    }
+
+    pub fn set_color(&mut self, color: CharColor) {
         self.color_code = color;
     }
 
