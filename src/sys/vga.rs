@@ -281,7 +281,8 @@ fn set_blink(enabled: bool) {
 }
 
 pub fn init() {
-    set_blink(false);
+    // this is broken
+    // set_blink(false);
     set_font(&font::IBM_BIOS);
 }
 
