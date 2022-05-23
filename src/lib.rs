@@ -22,6 +22,7 @@ pub fn init(boot_info: &'static BootInfo) {
     sys::idt::init();
     sys::pic::init();
     sys::time::init();
+    sys::vga::init();
 
     log!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 

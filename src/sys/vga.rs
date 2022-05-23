@@ -3,16 +3,24 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 use vte::{Params, Parser, Perform};
+use x86_64::instructions::{interrupts::without_interrupts, port::Port};
+
+pub mod font;
+
+use font::Font;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
 const FG: Color = Color::LightGray;
 const BG: Color = Color::Black;
 
+const SEQUENCER_ADDR_REG: u16 = 0x3c4;
+const GRAPHICS_ADDR_REG: u16 = 0x3ce;
+
 lazy_static! {
     pub static ref PARSER: Mutex<Parser> = Mutex::new(Parser::new());
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
+        next_position: (0, 0),
         color_code: CharColor::new(FG, BG),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
@@ -98,7 +106,7 @@ pub struct Buffer {
 }
 
 pub struct Writer {
-    pub column_position: usize,
+    pub next_position: (usize, usize),
     pub color_code: CharColor,
     pub buffer: &'static mut Buffer,
 }
@@ -108,30 +116,33 @@ impl Writer {
         match byte {
             b'\n' => self.new_line(),
             byte => {
-                if self.column_position >= BUFFER_WIDTH {
+                if self.next_position.0 >= BUFFER_WIDTH {
                     self.new_line();
                 }
 
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
+                let (col, row) = self.next_position;
                 let c = ScreenChar::new(byte, self.color_code);
 
                 unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row][col], c) };
-                self.column_position += 1;
+                self.next_position.0 += 1;
             }
         }
     }
 
     fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let c = self.buffer.chars[row][col];
+        if self.next_position.1 < BUFFER_HEIGHT - 1 {
+            self.next_position.1 += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let c = self.buffer.chars[row][col];
 
-                unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row - 1][col], c) };
+                    unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row - 1][col], c) };
+                }
             }
+            self.clear_row(self.next_position.1);
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;
+        self.next_position.0 = 0;
     }
 
     fn clear_row(&mut self, row: usize) {
@@ -146,6 +157,38 @@ impl Writer {
 
     fn set_color(&mut self, color: CharColor) {
         self.color_code = color;
+    }
+
+    fn set_font(&mut self, font: &Font) {
+        let mut sequencer: Port<u16> = Port::new(SEQUENCER_ADDR_REG);
+        let mut graphics: Port<u16> = Port::new(GRAPHICS_ADDR_REG);
+        let buffer = 0xA0000 as *mut u8;
+
+        unsafe {
+            sequencer.write(0x0100); // do a sync reset
+            sequencer.write(0x0402); // write plane 2 only
+            sequencer.write(0x0704); // sequetial access
+            sequencer.write(0x0300); // end the reset
+            graphics.write(0x0204); // read plane 2 only
+            graphics.write(0x0005); // disable odd/even
+            graphics.write(0x0006); // VRAM at 0xA0000
+
+            for i in 0..font.size as usize {
+                for j in 0..font.height as usize {
+                    let vga_offset = j + i * 32;
+                    let fnt_offset = j + i * font.height as usize;
+                    buffer.add(vga_offset).write_volatile(font.data[fnt_offset]);
+                }
+            }
+
+            sequencer.write(0x0100); // do a sync reset
+            sequencer.write(0x0302); // write plane 0 & 1
+            sequencer.write(0x0304); // even/odd access
+            sequencer.write(0x0300); // end the reset
+            graphics.write(0x0004); // restore to default
+            graphics.write(0x1005); // resume odd/even
+            graphics.write(0x0E06); // VRAM at 0xB800
+        }
     }
 }
 
@@ -202,6 +245,32 @@ impl fmt::Write for Writer {
 
         Ok(())
     }
+}
+
+fn set_blink(enabled: bool) {
+    unsafe { Port::<u8>::new(0x3da).read() };
+
+    let mut attr = Port::<u8>::new(0x3c0);
+    unsafe { attr.write(0x30) };
+
+    let mut flags: u8 = unsafe { Port::new(0x31).read() };
+    if enabled {
+        flags |= 0x08;
+    } else {
+        flags &= 0xf7;
+    }
+    unsafe { attr.write(flags) };
+}
+
+pub fn init() {
+    set_blink(false);
+    set_font(&font::IBM_BIOS);
+}
+
+pub fn set_font(font: &Font) {
+    without_interrupts(|| {
+        WRITER.lock().set_font(font);
+    });
 }
 
 pub fn print_fmt(args: fmt::Arguments) {
