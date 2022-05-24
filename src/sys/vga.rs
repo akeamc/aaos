@@ -1,9 +1,10 @@
 use core::fmt;
 
+use bit_field::BitField;
 use lazy_static::lazy_static;
 use spin::Mutex;
 use vte::{Params, Parser, Perform};
-use x86_64::instructions::{interrupts::without_interrupts, port::Port};
+use x86_64::instructions::{interrupts, port::Port};
 
 pub mod font;
 
@@ -16,11 +17,16 @@ const BG: Color = Color::Black;
 
 const SEQUENCER_ADDR_REG: u16 = 0x3c4;
 const GRAPHICS_ADDR_REG: u16 = 0x3ce;
+const INPUT_STATUS_REG: u16 = 0x3da;
+const CRTC_REG: u16 = 0x3d4;
 
 lazy_static! {
-    pub static ref PARSER: Mutex<Parser> = Mutex::new(Parser::new());
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        next_position: (0, 0),
+    static ref PARSER: Mutex<Parser> = Mutex::new(Parser::new());
+    /// Remember to disable interrupts when the lock is held,
+    /// as an unexpected interrupt might result in a deadlock.
+    static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        writer_position: (0, 0),
+        cursor_position: (0, 0),
         color_code: CharColor::new(FG, BG),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
@@ -106,7 +112,8 @@ pub struct Buffer {
 }
 
 pub struct Writer {
-    pub next_position: (usize, usize),
+    pub writer_position: (usize, usize),
+    cursor_position: (usize, usize),
     pub color_code: CharColor,
     pub buffer: &'static mut Buffer,
 }
@@ -117,33 +124,33 @@ impl Writer {
             b'\n' => self.new_line(),
             0x08 => {
                 // backspace
-                if self.next_position.0 > 0 {
+                if self.writer_position.0 > 0 {
                     let c = ScreenChar {
                         ascii_character: b' ',
                         color_code: self.color_code,
                     };
-                    self.next_position.0 -= 1;
-                    let (col, row) = self.next_position;
+                    self.writer_position.0 -= 1;
+                    let (col, row) = self.writer_position;
                     unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row][col], c) };
                 }
             }
             byte => {
-                if self.next_position.0 >= BUFFER_WIDTH {
+                if self.writer_position.0 >= BUFFER_WIDTH {
                     self.new_line();
                 }
 
-                let (col, row) = self.next_position;
+                let (col, row) = self.writer_position;
                 let c = ScreenChar::new(byte, self.color_code);
 
                 unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row][col], c) };
-                self.next_position.0 += 1;
+                self.writer_position.0 += 1;
             }
         }
     }
 
     fn new_line(&mut self) {
-        if self.next_position.1 < BUFFER_HEIGHT - 1 {
-            self.next_position.1 += 1;
+        if self.writer_position.1 < BUFFER_HEIGHT - 1 {
+            self.writer_position.1 += 1;
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
@@ -152,9 +159,10 @@ impl Writer {
                     unsafe { core::ptr::write_volatile(&mut self.buffer.chars[row - 1][col], c) };
                 }
             }
-            self.clear_row(self.next_position.1);
+            self.clear_row(self.writer_position.1);
         }
-        self.next_position.0 = 0;
+        self.writer_position.0 = 0;
+        self.cursor_at_writer();
     }
 
     fn clear_row(&mut self, row: usize) {
@@ -167,13 +175,19 @@ impl Writer {
         }
     }
 
+    fn clear_screen(&mut self) {
+        for i in 0..BUFFER_HEIGHT {
+            self.clear_row(i);
+        }
+    }
+
     fn set_color(&mut self, color: CharColor) {
         self.color_code = color;
     }
 
     fn set_font(&mut self, font: &Font) {
-        let mut sequencer: Port<u16> = Port::new(SEQUENCER_ADDR_REG);
-        let mut graphics: Port<u16> = Port::new(GRAPHICS_ADDR_REG);
+        let mut sequencer = Port::<u16>::new(SEQUENCER_ADDR_REG);
+        let mut graphics = Port::<u16>::new(GRAPHICS_ADDR_REG);
         let buffer = 0xA0000 as *mut u8;
 
         unsafe {
@@ -201,6 +215,31 @@ impl Writer {
             graphics.write(0x1005); // resume odd/even
             graphics.write(0x0E06); // VRAM at 0xB800
         }
+    }
+
+    fn write_cursor(&mut self) {
+        let pos = (self.cursor_position.1 * BUFFER_WIDTH + self.cursor_position.0) as u16;
+        let bytes = pos.to_le_bytes();
+
+        let mut addr = Port::<u8>::new(CRTC_REG);
+        let mut data = Port::<u8>::new(CRTC_REG + 1);
+
+        unsafe {
+            addr.write(0x0f);
+            data.write(bytes[0]);
+            addr.write(0x0e);
+            data.write(bytes[1])
+        };
+    }
+
+    pub fn set_cursor_position(&mut self, x: usize, y: usize) {
+        self.cursor_position = (x, y);
+        self.write_cursor();
+    }
+
+    pub fn cursor_at_writer(&mut self) {
+        let (x, y) = self.writer_position;
+        self.set_cursor_position(x, y);
     }
 }
 
@@ -254,40 +293,45 @@ impl fmt::Write for Writer {
         for byte in s.bytes() {
             parser.advance(self, byte);
         }
+        self.cursor_at_writer();
 
         Ok(())
     }
 }
 
+/// Enable or disable VGA text blink.
 fn set_blink(enabled: bool) {
-    unsafe { Port::<u8>::new(0x3da).read() };
-
+    let mut input = Port::<u8>::new(INPUT_STATUS_REG);
     let mut attr = Port::<u8>::new(0x3c0);
-    unsafe { attr.write(0x30) };
+    let mut data = Port::<u8>::new(0x3c1);
 
-    let mut flags: u8 = unsafe { Port::new(0x31).read() };
-    if enabled {
-        flags |= 0x08;
-    } else {
-        flags &= 0xf7;
-    }
+    unsafe { input.read() }; // reset ISR to address mode
+    unsafe { attr.write(0x10 | 0x20) }; // select attribute mode control register
+    let mut flags = unsafe { data.read() };
+    flags.set_bit(3, enabled);
     unsafe { attr.write(flags) };
 }
 
-pub fn init() {
-    set_blink(false);
-    set_font(&font::IBM_BIOS);
+pub fn set_font(font: &Font) {
+    interrupts::without_interrupts(|| {
+        WRITER.lock().set_font(font);
+    });
 }
 
-pub fn set_font(font: &Font) {
-    without_interrupts(|| {
-        WRITER.lock().set_font(font);
+pub fn init() {
+    interrupts::without_interrupts(|| {
+        WRITER.lock().clear_screen();
+    });
+    set_blink(false);
+    set_font(&font::IBM_BIOS);
+
+    interrupts::without_interrupts(|| {
+        WRITER.lock().set_cursor_position(1, 5);
     });
 }
 
 pub fn print_fmt(args: fmt::Arguments) {
     use core::fmt::Write;
-    use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
