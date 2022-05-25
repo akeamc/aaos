@@ -324,10 +324,6 @@ pub fn init() {
     });
     set_blink(false);
     set_font(&font::IBM_BIOS);
-
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_cursor_position(1, 5);
-    });
 }
 
 pub fn print_fmt(args: fmt::Arguments) {
