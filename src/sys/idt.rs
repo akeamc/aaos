@@ -6,20 +6,22 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, Pag
 use crate::hlt_loop;
 
 lazy_static! {
-  static ref IDT: InterruptDescriptorTable = {
-      let mut idt = InterruptDescriptorTable::new();
-      idt.breakpoint.set_handler_fn(handle_breakpoint);
-      unsafe {
-        idt.double_fault.set_handler_fn(handle_double_fault)
-            .set_stack_index(sys::gdt::DOUBLE_FAULT_IST_INDEX); // new
-    }
-    idt.page_fault.set_handler_fn(handle_page_fault);
+    static ref IDT: InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
+        idt.breakpoint.set_handler_fn(handle_breakpoint);
+        unsafe {
+            idt.double_fault
+                .set_handler_fn(handle_double_fault)
+                .set_stack_index(sys::gdt::DOUBLE_FAULT_IST_INDEX);
+        }
+        idt.page_fault.set_handler_fn(handle_page_fault);
 
-    idt[Irq::Timer.as_usize()].set_handler_fn(sys::time::handle_timer_interrupt);
-    idt[Irq::Keyboard.as_usize()].set_handler_fn(sys::keyboard::handle_interrupt);
+        idt[Irq::Timer.as_usize()].set_handler_fn(sys::time::handle_timer_interrupt);
+        idt[Irq::Keyboard.as_usize()].set_handler_fn(sys::keyboard::handle_interrupt);
+        idt[Irq::Rtc.as_usize()].set_handler_fn(sys::clock::handle_rtc_interrupt);
 
-      idt
-  };
+        idt
+    };
 }
 
 /// Initialize the Interrupt Descriptor Table (IDT).

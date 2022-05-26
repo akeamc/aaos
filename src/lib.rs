@@ -27,6 +27,7 @@ pub fn init(boot_info: &'static BootInfo) {
     log!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
     sys::memory::init(boot_info);
+    sys::clock::init();
 }
 
 pub trait Testable {

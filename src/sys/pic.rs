@@ -10,6 +10,7 @@ pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 pub enum Irq {
     Timer = PIC_1_OFFSET,
     Keyboard,
+    Rtc = PIC_1_OFFSET + 8,
 }
 
 impl Irq {
