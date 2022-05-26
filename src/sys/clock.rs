@@ -22,12 +22,12 @@ pub fn uptime() -> f64 {
 
 /// Handle an RTC interrupt.
 pub(crate) extern "x86-interrupt" fn handle_rtc_interrupt(_stack_frame: InterruptStackFrame) {
-    log!("rtc interrupt");
-
     let mut cmos = Cmos::new();
-    let rtc = cmos.rtc();
-    log!("{:?}", rtc);
+    let rtc = cmos.rtc_unchecked();
+
     cmos.notify_end_of_interrupt();
+
+    let dt = rtc.datetime();
 }
 
 pub fn init() {
