@@ -59,7 +59,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     }
     serial_println!();
 
-    exit_qemu(QemuExitCode::Success)
+    exit_qemu(QemuExitCode::Success);
 }
 
 pub fn test_panic_handler(info: &PanicInfo) -> ! {

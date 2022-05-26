@@ -1,3 +1,4 @@
+#![allow(clippy::cast_possible_truncation)]
 use core::fmt;
 
 use bit_field::BitField;
@@ -55,11 +56,15 @@ pub enum Color {
 }
 
 impl Color {
-    pub fn from_ansi(code: u8) -> Self {
-        use Color::*;
+    #[must_use]
+    pub const fn from_ansi(code: u8) -> Self {
+        use Color::{
+            Black, Blue, Brown, Cyan, DarkGray, Green, LightBlue, LightCyan, LightGray, LightGreen,
+            LightRed, Magenta, Pink, Red, White, Yellow,
+        };
 
         match code {
-            30 => Black,
+            // 30 => Black,
             31 => Red,
             32 => Green,
             33 => Brown,
@@ -85,6 +90,7 @@ impl Color {
 pub struct CharColor(pub u8);
 
 impl CharColor {
+    #[must_use]
     pub const fn new(foreground: Color, background: Color) -> Self {
         Self((background as u8) << 4 | (foreground as u8))
     }
@@ -98,7 +104,8 @@ pub struct ScreenChar {
 }
 
 impl ScreenChar {
-    pub fn new(ascii_character: u8, color_code: CharColor) -> Self {
+    #[must_use]
+    pub const fn new(ascii_character: u8, color_code: CharColor) -> Self {
         Self {
             ascii_character,
             color_code,
@@ -185,6 +192,7 @@ impl Writer {
         self.color_code = color;
     }
 
+    #[allow(clippy::unused_self)]
     fn set_font(&mut self, font: &Font) {
         let mut sequencer = Port::<u16>::new(SEQUENCER_ADDR_REG);
         let mut graphics = Port::<u16>::new(GRAPHICS_ADDR_REG);
@@ -228,7 +236,7 @@ impl Writer {
             addr.write(0x0f);
             data.write(bytes[0]);
             addr.write(0x0e);
-            data.write(bytes[1])
+            data.write(bytes[1]);
         };
     }
 
@@ -253,6 +261,7 @@ impl Perform for Writer {
     }
 
     fn csi_dispatch(&mut self, params: &Params, _intermediates: &[u8], _ignore: bool, c: char) {
+        #[allow(clippy::single_match)]
         match c {
             'm' => {
                 let mut fg = FG;
@@ -273,15 +282,15 @@ impl Perform for Writer {
 
                 self.set_color(CharColor::new(fg, bg));
             }
-            'A' => {}
-            'B' => {}
-            'C' => {}
-            'D' => {}
-            'E' => {}
-            'F' => {}
-            'G' => {}
-            'J' => {}
-            'K' => {}
+            // 'A' => {}
+            // 'B' => {}
+            // 'C' => {}
+            // 'D' => {}
+            // 'E' => {}
+            // 'F' => {}
+            // 'G' => {}
+            // 'J' => {}
+            // 'K' => {}
             _ => {}
         }
     }
@@ -326,6 +335,10 @@ pub fn init() {
     set_font(&font::IBM_BIOS);
 }
 
+/// # Panics
+///
+/// Failing to write to the buffer will result
+/// in a panic.
 pub fn print_fmt(args: fmt::Arguments) {
     use core::fmt::Write;
 

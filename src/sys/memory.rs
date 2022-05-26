@@ -20,6 +20,7 @@ pub fn init(boot_info: &'static BootInfo) {
 /// # Safety
 ///
 /// yolo
+#[must_use]
 pub unsafe fn mapper(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
     OffsetPageTable::new(level_4_table, physical_memory_offset)
@@ -58,7 +59,8 @@ impl BootInfoFrameAllocator {
     /// This function is unsafe because the caller must guarantee that the passed
     /// memory map is valid. The main requirement is that all frames that are marked
     /// as `USABLE` in it are really unused.
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+    #[must_use]
+    pub const unsafe fn init(memory_map: &'static MemoryMap) -> Self {
         Self {
             memory_map,
             next: 0,

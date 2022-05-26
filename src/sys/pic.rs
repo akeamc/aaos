@@ -14,12 +14,14 @@ pub enum Irq {
 }
 
 impl Irq {
-    pub fn as_u8(self) -> u8 {
+    #[must_use]
+    pub const fn as_u8(self) -> u8 {
         self as u8
     }
 
-    pub fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
+    #[must_use]
+    pub const fn as_usize(self) -> usize {
+        self.as_u8() as usize
     }
 }
 

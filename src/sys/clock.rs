@@ -14,12 +14,24 @@ mod cmos;
 static LAST_RTC_UPDATE: AtomicUsize = AtomicUsize::new(0);
 
 /// System uptime (seconds).
+#[must_use]
+#[allow(clippy::cast_precision_loss)]
 pub fn uptime() -> f64 {
     PIT_INTERVAL_SECS * ticks() as f64
 }
 
+/// # Panics
+///
+/// If the date returned by CMOS isn't a valid date,
+/// this function panics.
+#[must_use]
+#[allow(clippy::cast_precision_loss)]
+#[allow(clippy::cast_possible_truncation)]
 pub fn realtime() -> PrimitiveDateTime {
-    let datetime: PrimitiveDateTime = Cmos::new().rtc_checked().try_into().unwrap();
+    let datetime: PrimitiveDateTime = Cmos::new()
+        .rtc_checked()
+        .try_into()
+        .expect("invalid date returned by CMOS");
     let fract = PIT_INTERVAL_SECS * (ticks() - LAST_RTC_UPDATE.load(Ordering::Relaxed)) as f64;
     let nanos = (fract * 1_000_000_000.0) as _;
     datetime + Duration::nanoseconds(nanos)

@@ -40,7 +40,7 @@ fn set_pit_frequency_divider(divider: u16, channel: u8) {
     interrupts::without_interrupts(|| {
         let bytes = divider.to_le_bytes();
         let mut cmd: Port<u8> = Port::new(0x43);
-        let mut data: Port<u8> = Port::new(0x40 + channel as u16);
+        let mut data: Port<u8> = Port::new(0x40 + u16::from(channel));
         let operating_mode = 6; // Square wave generator
         let access_mode = 3; // Lobyte + Hibyte
 

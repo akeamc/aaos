@@ -8,6 +8,7 @@ pub struct Font<'a> {
 }
 
 impl<'a> Font<'a> {
+    #[must_use]
     pub const fn from_dos_f16(data: &'a [u8]) -> Self {
         Self {
             size: 256,

@@ -41,7 +41,7 @@ impl Cmos {
     }
 
     pub fn enable_update_interrupt(&mut self) {
-        self.enable_interrupt(Interrupt::Update)
+        self.enable_interrupt(Interrupt::Update);
     }
 
     fn enable_interrupt(&mut self, interrupt: Interrupt) {
@@ -183,13 +183,13 @@ impl TryFrom<Rtc> for PrimitiveDateTime {
     fn try_from(value: Rtc) -> Result<Self, Self::Error> {
         let century = if value.year < 70 { 2000 } else { 1900 };
         let date = Date::from_calendar_date(
-            value.year as i32 + century,
+            i32::from(value.year) + century,
             value.month.try_into()?,
             value.day,
         )?;
         let time = Time::from_hms(value.hour, value.minute, value.second)?;
 
-        Ok(PrimitiveDateTime::new(date, time))
+        Ok(Self::new(date, time))
     }
 }
 
@@ -197,12 +197,12 @@ impl TryFrom<Rtc> for PrimitiveDateTime {
 fn rtc_bcd() {
     assert_eq!(
         Rtc::from_registers(
-            0b01010001, // 5 << 4 | 1
-            0b00001001, // 0 << 4 | 9
-            0b00110001, // 3 << 4 | 1
-            0b00110001, // 3 << 4 | 1
-            0b00000011, // 0 << 4 | 3
-            0b01110000, // 7 << 4 | 0
+            0b0101_0001, // 5 << 4 | 1
+            0b0000_1001, // 0 << 4 | 9
+            0b0011_0001, // 3 << 4 | 1
+            0b0011_0001, // 3 << 4 | 1
+            0b0000_0011, // 0 << 4 | 3
+            0b0111_0000, // 7 << 4 | 0
             0x0
         ),
         Rtc {
