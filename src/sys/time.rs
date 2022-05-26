@@ -59,6 +59,7 @@ pub(crate) extern "x86-interrupt" fn handle_timer_interrupt(_stack_frame: Interr
 }
 
 pub fn init() {
+    #[allow(clippy::cast_possible_truncation)]
     let divider = if PIT_DIVIDER < u16::MAX.into() {
         PIT_DIVIDER as _
     } else {

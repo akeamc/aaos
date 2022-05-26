@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use aaos::{log, println};
+use aaos::log;
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 
@@ -27,7 +27,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
+    aaos::println!("{}", info);
     aaos::hlt_loop()
 }
 

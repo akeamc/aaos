@@ -1,13 +1,10 @@
 use core::hint::spin_loop;
 
 use bit_field::BitField;
-use time::{Date, Month, PrimitiveDateTime, Time};
+use time::{Date, PrimitiveDateTime, Time};
 use x86_64::instructions::{interrupts, port::Port};
 
-use crate::sys::{
-    pic::{Irq, PICS},
-    time::halt,
-};
+use crate::sys::pic::{Irq, PICS};
 
 #[repr(u8)]
 enum Register {
@@ -23,6 +20,7 @@ enum Register {
 }
 
 #[repr(u8)]
+#[allow(unused)]
 enum Interrupt {
     Periodic = 1 << 6,
     Alarm = 1 << 5,
@@ -60,7 +58,7 @@ impl Cmos {
 
     /// Read from the CMOS registers without checking if an
     /// update is in progress, etc.
-    pub fn rtc_unchecked(&mut self) -> Rtc {
+    fn rtc_unchecked(&mut self) -> Rtc {
         Rtc::from_registers(
             self.read_register(Register::Second),
             self.read_register(Register::Minute),
@@ -177,24 +175,21 @@ impl Rtc {
             year,
         }
     }
+}
 
-    fn date(&self) -> Date {
-        let century = if self.year < 70 { 2000 } else { 1900 };
+impl TryFrom<Rtc> for PrimitiveDateTime {
+    type Error = time::Error;
 
-        Date::from_calendar_date(
-            self.year as i32 + century,
-            self.month.try_into().expect("invalid month"),
-            self.day,
-        )
-        .expect("invalid date range")
-    }
+    fn try_from(value: Rtc) -> Result<Self, Self::Error> {
+        let century = if value.year < 70 { 2000 } else { 1900 };
+        let date = Date::from_calendar_date(
+            value.year as i32 + century,
+            value.month.try_into()?,
+            value.day,
+        )?;
+        let time = Time::from_hms(value.hour, value.minute, value.second)?;
 
-    fn time(&self) -> Time {
-        Time::from_hms(self.hour, self.minute, self.second).expect("invalid time")
-    }
-
-    pub fn datetime(&self) -> PrimitiveDateTime {
-        PrimitiveDateTime::new(self.date(), self.time())
+        Ok(PrimitiveDateTime::new(date, time))
     }
 }
 
@@ -218,5 +213,5 @@ fn rtc_bcd() {
             month: 3,
             year: 70
         }
-    )
+    );
 }

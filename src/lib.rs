@@ -5,6 +5,8 @@
 #![cfg_attr(test, no_main)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
 
 extern crate alloc;
 
